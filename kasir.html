@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kasir - Faat Choi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/common.js"></script>
+</head>
+<body>
+  <div class="pos-app" id="app"></div>
+
+  <script>
+    let S = null;
+    let currentTab = 'kasir';
+    let menuCategory = 'Semua';
+    let menuSearch = '';
+    let stockSearch = '';
+    let cart = [];
+    let F = {
+      cust: '',
+      meja: '',
+      jam: 1,
+      isOpen: false,
+      diskon: 0,
+      catatan: '',
+      metode: 'Tunai',
+      bayar: 0
+    };
+    let notifiedOver = {};
+
+    boot('kasir', main);
+
+    function main() {
+      $('app').innerHTML = `
+        ${renderHeader('Point of Sale & Kasir')}
+        <div id="al-box"></div>
+        <nav class="pos-nav">
+          <button id="nav-kasir" class="active" onclick="switchTab('kasir')">🎯 Meja & Kasir</button>
+          <button id="nav-pending" onclick="switchTab('pending')">⏳ Tagihan Pending <span id="badge-pending" class="badge badge-pending" style="display:none;">0</span></button>
+          <button id="nav-history" onclick="switchTab('history')">📜 Riwayat Transaksi</button>
+          <button id="nav-menu" onclick="switchTab('menu')">📦 Cek Stok Barang</button>
+          <button id="btn-share-tv" class="btn btn-sm" style="margin-left:auto; background:linear-gradient(135deg, rgba(6,182,212,0.25), rgba(16,185,129,0.25)); color:var(--cyan); border:1px solid var(--cyan); font-weight:700;" onclick="toggleKasirScreenShare()" title="Bagi layar tab YouTube atau Spotify langsung ke layar TV display">📺 Share Layar ke TV</button>
+          <button class="btn btn-sm" style="background:rgba(255,255,255,0.06); color:var(--tx-sub); border-color:var(--card-border);" onclick="dialogNowPlaying()">🎵 Info Lagu TV</button>
+        </nav>
+        <div id="kasir-stream-banner" style="display:none; background:linear-gradient(135deg, rgba(6,182,212,0.18), rgba(16,185,129,0.18)); border:1px solid var(--cyan); border-radius:var(--radius-sm); padding:10px 16px; margin-bottom:14px; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">📺</span>
+            <div>
+              <div style="font-weight:800; color:var(--cyan); font-size:13px;">SIARAN KE LAYAR TV DISPLAY SEDANG AKTIF</div>
+              <div style="font-size:12px; color:var(--tx-muted);">Pelanggan di layar TV sedang menonton tab / jendela yang Anda bagikan (YouTube / Spotify).</div>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="stopKasirScreenShare()">🛑 Hentikan Siaran</button>
+        </div>
+        <div id="view-content"></div>
+      `;
+
+      switchTab('kasir');
+      pull();
+      setInterval(pull, 4000);
+      setInterval(tick, 1000);
+    }
+
+    async function pull() {
+      try {
+        S = await api('/api/db');
+        serverOffset = S.now - Date.now();
+        window.NAMA = 'Faat Choi';
+        window.TARIF_INFO = S.tarifInfo;
+        window.CURRENT_TARIF = S.tarifInfo ? S.tarifInfo.tarif : (S.cfg.tarif || 50000);
+        window.TARIF = window.CURRENT_TARIF;
+        window.MEJA_COUNT = S.cfg.meja;
+        window.ACTIVE_TABLES = S.tables;
+        window.MENU_LIST = S.menu;
+        window.ALL_TRX = S.trx;
+        window.NOW_PLAYING = S.cfg.nowPlaying;
+        
+        const hdr = $('hdr-nama');
+        if (hdr) hdr.textContent = 'Faat Choi';
+
+        const rateTxt = $('rate-text');
+        if (rateTxt && S.tarifInfo) {
+          rateTxt.innerHTML = `<b>${S.tarifInfo.dayName}</b> (${S.tarifInfo.isWeekend ? 'Weekend' : 'Weekday'}) · <b>${rp(S.tarifInfo.tarif)}/jam</b>`;
+        }
+
+        const pendingCount = (S.trx || []).filter(t => t.status === 'pending').length;
+        const pBadge = $('badge-pending');
+        if (pBadge) {
+          pBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+          pBadge.textContent = pendingCount;
+        }
+
+        renderCurrentView();
+      } catch (err) {
+        console.error('Pull error:', err);
+      }
+    }
+    window.pull = pull;
+
+    function switchTab(t) {
+      currentTab = t;
+      ['kasir', 'pending', 'history', 'menu'].forEach(k => {
+        const el = $('nav-' + k);
+        if (el) el.className = (k === t) ? 'active' : '';
+      });
+
+      const container = $('view-content');
+      if (t === 'kasir') {
+        container.innerHTML = `
+          <div class="c-card">
+            <div class="c-title">
+              <span>Status Meja Faat Choi Mahjong</span>
+              <span class="m" id="table-rate-sub" style="font-size:12px; font-weight:normal;">Memuat tarif...</span>
+            </div>
+            <div class="table-grid" id="tb-grid"></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="c-card">
+              <div class="c-title">
+                <span>Daftar Menu & Minuman</span>
+                <input id="src-menu" type="text" placeholder="🔍 Cari menu..." 
+                  style="max-width:200px; margin:0; padding:6px 12px; font-size:13px;"
+                  oninput="menuSearch=this.value; renderMenuList()">
+              </div>
+              <div id="cat-pills" style="display:flex; gap:6px; margin-bottom:12px; overflow-x:auto;"></div>
+              <div id="menu-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; max-height:480px; overflow-y:auto; padding-right:4px;"></div>
+            </div>
+
+            <div class="c-card" id="cart-panel"></div>
+          </div>
+        `;
+        renderCartForm();
+      } else if (t === 'pending') {
+        container.innerHTML = `<div id="pending-view"></div>`;
+      } else if (t === 'history') {
+        container.innerHTML = `<div id="history-view"></div>`;
+      } else if (t === 'menu') {
+        container.innerHTML = `<div id="menu-view"></div>`;
+      }
+
+      renderCurrentView();
+    }
+
+    function tick() {
+      if (!S) return;
+      if (currentTab === 'kasir') {
+        const grid = $('tb-grid');
+        if (grid) grid.innerHTML = tablesHTML(S.tables, S.cfg.meja, now(), 'kasir');
+      }
+      checkTableAlarms();
+    }
+
+    function checkTableAlarms() {
+      if (!S || !S.tables) return;
+      const nw = now();
+      const expired = [];
+
+      Object.keys(S.tables).forEach(k => {
+        const tbl = S.tables[k];
+        if (!tbl.isOpen && tbl.end && tbl.end <= nw) {
+          expired.push({ no: k, ...tbl });
+          const key = k + ':' + tbl.end;
+          if (!notifiedOver[key]) {
+            notifiedOver[key] = true;
+            playSound('alarm');
+            toast(`Waktu Meja ${k} (${tbl.cust}) sudah SELESAI!`, 'warn', 6000);
+          }
+        }
+      });
+
+      const alBox = $('al-box');
+      if (alBox) {
+        if (expired.length > 0) {
+          alBox.innerHTML = expired.map(e => `
+            <div class="pos-banner">
+              <div>
+                <strong>⚠️ Meja ${e.no} (${esc(e.cust)})</strong> — Waktu sewa telah berakhir!
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm" onclick="dialogExtend(${e.no})">+ Tambah Jam</button>
+                <button class="btn btn-sm btn-danger" onclick="dialogFree(${e.no})">Kosongkan Meja</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          alBox.innerHTML = '';
+        }
+      }
+    }
+
+    function renderCurrentView() {
+      if (!S) return;
+      if (currentTab === 'kasir') {
+        const grid = $('tb-grid');
+        if (grid) grid.innerHTML = tablesHTML(S.tables, S.cfg.meja, now(), 'kasir');
+        const sub = $('table-rate-sub');
+        if (sub && S.tarifInfo) {
+          sub.textContent = `Tarif hari ini: ${rp(S.tarifInfo.tarif)}/jam (${S.tarifInfo.label})`;
+        }
+        renderMenuList();
+        updateMejaOptions();
+      } else if (currentTab === 'pending') {
+        renderPendingView();
+      } else if (currentTab === 'history') {
+        renderHistoryView();
+      } else if (currentTab === 'menu') {
+        renderCheckStockView();
+      }
+    }
+
+    function renderMenuList() {
+      const catBox = $('cat-pills');
+      const listBox = $('menu-list');
+      if (!catBox || !listBox) return;
+
+      const categories = ['Semua'];
+      (S.menu || []).forEach(m => {
+        const c = m.cat || 'Minuman';
+        if (!categories.includes(c)) categories.push(c);
+      });
+
+      catBox.innerHTML = categories.map(c => `
+        <button class="btn btn-sm ${menuCategory === c ? 'btn-primary' : ''}" 
+          style="padding:4px 10px; font-size:12px; white-space:nowrap;"
+          onclick="menuCategory='${c}'; renderMenuList()">${c}</button>
+      `).join('');
+
+      const filtered = (S.menu || []).filter(m => {
+        const matchCat = (menuCategory === 'Semua') || ((m.cat || 'Minuman') === menuCategory);
+        const matchSrc = !menuSearch || m.n.toLowerCase().includes(menuSearch.toLowerCase());
+        return matchCat && matchSrc;
+      });
+
+      if (filtered.length === 0) {
+        listBox.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--tx-muted);">Menu tidak ditemukan</div>`;
+        return;
+      }
+
+      listBox.innerHTML = filtered.map(m => {
+        const inCart = cart.find(x => x.id === m.id);
+        const qtyInCart = inCart ? inCart.q : 0;
+        const available = m.s - qtyInCart;
+        const outOfStock = available <= 0;
+
+        return `
+          <div class="c-card" style="margin:0; padding:12px; text-align:center; background:var(--bg); border-color:var(--card-border); cursor:${outOfStock ? 'not-allowed' : 'pointer'}; opacity:${outOfStock ? 0.5 : 1};"
+            onclick="${outOfStock ? '' : `addToCart(${m.id})`}">
+            <div style="font-size:24px; margin-bottom:4px;">🥤</div>
+            <div style="font-weight:700; font-size:13px; margin-bottom:2px; height:36px; overflow:hidden; text-overflow:ellipsis;">${esc(m.n)}</div>
+            <div style="color:var(--primary); font-weight:700; font-size:13px;">${rp(m.p)}</div>
+            <div style="font-size:11px; color:${available <= 3 ? 'var(--red)' : 'var(--tx-muted)'}; margin-top:4px;">
+              Stok: <b>${m.s}</b> ${qtyInCart ? `<span style="color:var(--blue);">(+${qtyInCart})</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addToCart(id) {
+      const item = S.menu.find(x => x.id === id);
+      if (!item) return;
+      const existing = cart.find(x => x.id === id);
+      const currentQty = existing ? existing.q : 0;
+      if (currentQty >= item.s) {
+        return toast(`Stok ${item.n} sudah mencapai batas (${item.s})`, 'warn');
+      }
+
+      if (existing) {
+        existing.q++;
+      } else {
+        cart.push({ id: item.id, n: item.n, p: item.p, q: 1 });
+      }
+
+      playSound('beep');
+      renderCartForm();
+      renderMenuList();
+    }
+
+    function changeCartQty(index, delta) {
+      const item = cart[index];
+      const m = S.menu.find(x => x.id === item.id);
+      if (delta > 0 && item.q >= m.s) {
+        return toast(`Stok ${m.n} tersisa ${m.s}`, 'warn');
+      }
+
+      item.q += delta;
+      if (item.q <= 0) cart.splice(index, 1);
+      renderCartForm();
+      renderMenuList();
+    }
+
+    function calculateCartTotal() {
+      const fnb = cart.reduce((acc, i) => acc + (i.p * i.q), 0);
+      const rate = window.CURRENT_TARIF || 50000;
+      const sewa = F.isOpen ? 0 : ((F.jam || 0) * rate);
+      const diskon = +F.diskon || 0;
+      return {
+        rate,
+        fnb,
+        sewa,
+        diskon,
+        grandTotal: Math.max(0, fnb + sewa - diskon)
+      };
+    }
+
+    function renderCartForm() {
+      const panel = $('cart-panel');
+      if (!panel) return;
+
+      const totals = calculateCartTotal();
+      const change = Math.max(0, (F.bayar || totals.grandTotal) - totals.grandTotal);
+      const rateInfo = window.TARIF_INFO ? `${window.TARIF_INFO.label}: ${rp(totals.rate)}/jam` : `${rp(totals.rate)}/jam`;
+
+      panel.innerHTML = `
+        <div class="c-title">
+          <span>Detail Transaksi & Pesanan</span>
+          <button class="btn btn-sm btn-danger" onclick="clearCart()">Reset</button>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:8px;">
+          <div>
+            <label>Nama Pelanggan</label>
+            <input type="text" placeholder="Contoh: AL / Dom / Budi" value="${esc(F.cust)}" 
+              oninput="F.cust=this.value">
+          </div>
+          <div>
+            <label>Pilih Meja</label>
+            <select id="sel-meja" onchange="F.meja=this.value"></select>
+          </div>
+        </div>
+
+        <label>
+          Pilihan Durasi Bermain:
+          ${F.isOpen ? `
+            <span style="color:var(--cyan); font-weight:700;">♾️ MAIN BEBAS (Hitungan stopwatch, bayar di akhir @${rp(totals.rate)}/jam)</span>
+          ` : `
+            <b>${F.jam} Jam</b> (${rp(totals.sewa)}) · <span style="color:var(--primary);">${rateInfo}</span>
+          `}
+        </label>
+        
+        <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+          <button class="btn btn-sm ${F.isOpen ? 'btn-cyan' : ''}" style="font-weight:800;" onclick="setModeOpen()">
+            ♾️ Main Bebas (Open Tab)
+          </button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 0) ? 'btn-primary' : ''}" onclick="setJam(0)">0 Jam (F&B)</button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 0.5) ? 'btn-primary' : ''}" onclick="setJam(0.5)">30 Menit</button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 1) ? 'btn-primary' : ''}" onclick="setJam(1)">1 Jam</button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 2) ? 'btn-primary' : ''}" onclick="setJam(2)">2 Jam</button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 3) ? 'btn-primary' : ''}" onclick="setJam(3)">3 Jam</button>
+          <button class="btn btn-sm ${(!F.isOpen && F.jam === 4) ? 'btn-primary' : ''}" onclick="setJam(4)">4 Jam</button>
+        </div>
+
+        <div class="c-title" style="margin-top:16px;">
+          <span>Item Pesanan F&B (${cart.reduce((a,c)=>a+c.q,0)})</span>
+        </div>
+
+        <div style="max-height:160px; overflow-y:auto; margin-bottom:12px; border-bottom:1px solid var(--card-border); padding-bottom:8px;">
+          ${cart.length === 0 ? `<div style="text-align:center; color:var(--tx-muted); font-size:13px; padding:12px;">Keranjang F&B kosong (bisa ditambah nanti saat bermain).</div>` : ''}
+          ${cart.map((it, idx) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0;">
+              <div>
+                <div style="font-weight:600; font-size:13px;">${esc(it.n)}</div>
+                <div style="font-size:11px; color:var(--tx-muted);">${rp(it.p)} x ${it.q}</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:700; font-size:13px;">${rp(it.p * it.q)}</span>
+                <button class="btn btn-sm" onclick="changeCartQty(${idx}, -1)">−</button>
+                <span style="font-size:13px; min-width:18px; text-align:center;">${it.q}</span>
+                <button class="btn btn-sm" onclick="changeCartQty(${idx}, 1)">+</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label>Diskon / Potongan (Rp)</label>
+            <input type="number" min="0" step="5000" placeholder="0" value="${F.diskon || ''}" 
+              oninput="F.diskon=+this.value||0; updateTotalsView()">
+          </div>
+          <div>
+            <label>Catatan Tambahan</label>
+            <input type="text" placeholder="Contoh: Es batu banyak" value="${esc(F.catatan)}" 
+              oninput="F.catatan=this.value">
+          </div>
+        </div>
+
+        <div class="c-card" style="background:var(--bg); padding:12px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+            <span style="color:var(--tx-muted);">Sewa Meja:</span>
+            <span>${F.isOpen ? '<b style="color:var(--cyan);">Hitung saat selesai (Main Bebas)</b>' : rp(totals.sewa)}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+            <span style="color:var(--tx-muted);">Pesanan Minum/Makan:</span>
+            <span>${rp(totals.fnb)}</span>
+          </div>
+          ${totals.diskon ? `
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; color:var(--red);">
+              <span>Potongan Diskon:</span>
+              <span>-${rp(totals.diskon)}</span>
+            </div>
+          ` : ''}
+          <div style="display:flex; justify-content:space-between; font-size:17px; font-weight:800; border-top:1px dashed var(--card-border); padding-top:6px; margin-top:6px;">
+            <span>${F.isOpen ? 'TAGIHAN AWAL' : 'TOTAL TAGIHAN'}</span>
+            <span style="color:var(--primary); font-family:var(--font-mono);">${rp(totals.grandTotal)}</span>
+          </div>
+        </div>
+
+        ${!F.isOpen ? `
+          <label>Metode Pembayaran</label>
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            ${['Tunai', 'QRIS', 'Transfer'].map(m => `
+              <button class="btn btn-block ${F.metode === m ? 'btn-primary' : ''}" 
+                onclick="F.metode='${m}'; renderCartForm()">${m}</button>
+            `).join('')}
+          </div>
+
+          ${F.metode === 'Tunai' ? `
+            <div style="margin-bottom:14px;">
+              <label>Uang Diterima (Rp)</label>
+              <input id="inp-bayar" type="number" step="5000" placeholder="${totals.grandTotal}" value="${F.bayar || ''}" 
+                oninput="F.bayar=+this.value||0; updateChangeView()">
+              <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                <button class="btn btn-sm" onclick="setBayarPreset(${totals.grandTotal})">Uang Pas</button>
+                <button class="btn btn-sm" onclick="setBayarPreset(50000)">50.000</button>
+                <button class="btn btn-sm" onclick="setBayarPreset(100000)">100.000</button>
+                <button class="btn btn-sm" onclick="setBayarPreset(200000)">200.000</button>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-top:10px; font-weight:700;">
+                <span style="color:var(--tx-muted);">Kembalian:</span>
+                <span id="txt-change" style="color:var(--amber); font-family:var(--font-mono); font-size:16px;">${rp(change)}</span>
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="grid-2">
+            <button class="btn btn-primary" style="padding:12px;" onclick="checkout('lunas')">
+              💵 Bayar Lunas (Cetak)
+            </button>
+            <button class="btn btn-amber" style="padding:12px;" onclick="checkout('pending')">
+              ⏳ Simpan Pending (Open Bill)
+            </button>
+          </div>
+        ` : `
+          <button class="btn btn-cyan btn-block" style="padding:14px; font-size:16px; font-weight:800;" onclick="checkoutOpen()">
+            🚀 Buka Meja (Mulai Main Bebas)
+          </button>
+        `}
+      `;
+
+      updateMejaOptions();
+    }
+
+    function setJam(j) {
+      F.isOpen = false;
+      F.jam = j;
+      renderCartForm();
+    }
+
+    function setModeOpen() {
+      F.isOpen = true;
+      F.jam = 0;
+      renderCartForm();
+    }
+
+    function setBayarPreset(val) {
+      F.bayar = val;
+      const inp = $('inp-bayar');
+      if (inp) inp.value = val;
+      updateChangeView();
+    }
+
+    function updateChangeView() {
+      const totals = calculateCartTotal();
+      const change = Math.max(0, (F.bayar || totals.grandTotal) - totals.grandTotal);
+      const chgEl = $('txt-change');
+      if (chgEl) chgEl.textContent = rp(change);
+    }
+
+    function updateTotalsView() {
+      renderCartForm();
+    }
+
+    function updateMejaOptions() {
+      const sel = $('sel-meja');
+      if (!sel || !S) return;
+      const cur = F.meja;
+      let opts = '<option value="">Tanpa Meja (Beli F&B Langsung)</option>';
+      for (let i = 1; i <= S.cfg.meja; i++) {
+        const isOccupied = S.tables[i];
+        opts += `<option value="${i}" ${isOccupied ? 'disabled' : ''} ${cur == i ? 'selected' : ''}>
+          Meja ${i} ${isOccupied ? `(Dipakai: ${esc(isOccupied.cust)})` : '(Kosong)'}
+        </option>`;
+      }
+      sel.innerHTML = opts;
+    }
+
+    function clearCart() {
+      cart = [];
+      F = { cust: '', meja: '', jam: 1, isOpen: false, diskon: 0, catatan: '', metode: 'Tunai', bayar: 0 };
+      renderCartForm();
+      renderMenuList();
+    }
+
+    async function checkoutOpen() {
+      if (!F.meja) return toast('Pilih nomor meja terlebih dahulu untuk main bebas', 'warn');
+      if (!F.cust.trim()) return toast('Nama pelanggan wajib diisi untuk main bebas', 'warn');
+
+      const payload = {
+        isOpen: true,
+        cust: F.cust,
+        meja: F.meja,
+        items: cart.map(i => ({ id: i.id, q: i.q })),
+        diskon: F.diskon,
+        catatan: F.catatan || 'Main Bebas'
+      };
+
+      const res = await act('/api/trx', payload);
+      if (res && res.ok) {
+        toast(`Meja ${F.meja} berhasil dibuka (Main Bebas / Stopwatch)`, 'success');
+        clearCart();
+      }
+    }
+
+    async function checkout(status) {
+      const totals = calculateCartTotal();
+      if (totals.grandTotal <= 0 && cart.length === 0 && !F.jam) {
+        return toast('Transaksi masih kosong', 'warn');
+      }
+
+      if (status === 'pending' && !F.cust.trim()) {
+        return toast('Nama pelanggan wajib diisi untuk transaksi pending', 'warn');
+      }
+
+      const payload = {
+        status,
+        isOpen: false,
+        cust: F.cust,
+        meja: F.meja,
+        jam: F.jam,
+        items: cart.map(i => ({ id: i.id, q: i.q })),
+        diskon: F.diskon,
+        catatan: F.catatan,
+        metode: F.metode,
+        bayar: F.metode === 'Tunai' ? (F.bayar || totals.grandTotal) : totals.grandTotal
+      };
+
+      const res = await act('/api/trx', payload);
+      if (res && res.ok) {
+        toast(`Transaksi ${res.t.no} berhasil disimpan (${status.toUpperCase()})`, 'success');
+        printThermal(res.t);
+        clearCart();
+      }
+    }
+
+    function renderPendingView() {
+      const box = $('pending-view');
+      if (!box || !S) return;
+
+      const pendings = (S.trx || []).filter(t => t.status === 'pending').reverse();
+      const totalPending = pendings.reduce((a, t) => a + t.total, 0);
+
+      box.innerHTML = `
+        <div class="c-card">
+          <div class="c-title">
+            <span>Daftar Tagihan Pending & Sesi Berjalan</span>
+            <span class="badge badge-pending big" style="font-size:14px;">Total: ${rp(totalPending)} (${pendings.length} tagihan)</span>
+          </div>
+
+          ${pendings.length === 0 ? `<div style="text-align:center; padding:40px; color:var(--tx-muted);">Tidak ada transaksi pending saat ini. Semua tagihan sudah lunas! 👏</div>` : ''}
+
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>No TRX</th>
+                  <th>Waktu</th>
+                  <th>Pelanggan</th>
+                  <th>Meja</th>
+                  <th>Mode / Detail</th>
+                  <th>Total Tagihan</th>
+                  <th style="text-align:right;">Aksi Pelunasan</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pendings.map(t => {
+                  const isActiveTable = t.meja && S.tables[t.meja] && S.tables[t.meja].trx == t.id;
+                  const isMainBebas = t.isOpen || (isActiveTable && S.tables[t.meja].isOpen);
+
+                  return `
+                    <tr>
+                      <td><b>${t.no}</b></td>
+                      <td>${tgl(t.ts)}</td>
+                      <td><b>${esc(t.cust)}</b></td>
+                      <td>${t.meja ? `Meja ${t.meja}` : '-'}</td>
+                      <td>
+                        ${isMainBebas ? `
+                          <span class="badge" style="background:rgba(6,182,212,0.15); color:var(--cyan); font-weight:800;">♾️ MAIN BEBAS (BERJALAN)</span>
+                        ` : (t.jam ? `<span class="badge" style="background:rgba(59,130,246,0.15); color:var(--blue);">Sewa ${t.jam}j</span> ` : '')}
+                        ${(t.items || []).map(i => `${esc(i.n)} x${i.q}`).join(', ')}
+                      </td>
+                      <td style="font-weight:700; color:var(--amber); font-family:var(--font-mono); font-size:15px;">
+                        ${isMainBebas ? '<i style="font-size:13px; color:var(--tx-muted);">(Dihitung saat selesai)</i>' : rp(t.total)}
+                      </td>
+                      <td style="text-align:right;">
+                        ${isMainBebas && isActiveTable ? `
+                          <button class="btn btn-sm btn-amber" onclick="dialogStopTable(${t.meja})">🛑 Selesai & Tagih</button>
+                        ` : `
+                          <button class="btn btn-sm btn-primary" onclick="dialogPayPending(${t.id})">Lunasi Sekarang</button>
+                        `}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function dialogPayPending(id) {
+      const t = S.trx.find(x => x.id === id);
+      if (!t) return;
+
+      const content = `
+        <div style="margin-bottom:12px;">
+          Pelunasan tagihan <b>${t.no}</b> untuk <b>${esc(t.cust)}</b>
+        </div>
+        <div class="c-card" style="background:var(--bg); margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800;">
+            <span>Total Tagihan:</span>
+            <span style="color:var(--primary);">${rp(t.total)}</span>
+          </div>
+        </div>
+
+        <label>Pilih Metode Bayar</label>
+        <select id="pay-metode" onchange="togglePayCashBox()">
+          <option>Tunai</option>
+          <option>QRIS</option>
+          <option>Transfer</option>
+        </select>
+
+        <div id="pay-cash-box">
+          <label>Uang Diterima (Rp)</label>
+          <input id="pay-bayar" type="number" step="5000" placeholder="${t.total}" value="${t.total}" oninput="calcPayChange(${t.total})">
+          <div style="display:flex; justify-content:space-between; margin-top:8px; font-weight:700;">
+            <span style="color:var(--tx-muted);">Kembalian:</span>
+            <span id="pay-change" style="color:var(--amber); font-family:var(--font-mono); font-size:16px;">Rp 0</span>
+          </div>
+        </div>
+      `;
+
+      const footer = `
+        <button class="btn" onclick="closeModal()">Batal</button>
+        <button class="btn btn-primary" onclick="submitPayPending(${t.id})">Konfirmasi Pelunasan</button>
+      `;
+
+      openModal(`Pelunasan Tagihan ${t.no}`, content, footer);
+
+      window.calcPayChange = (tot) => {
+        const b = +$('pay-bayar').value || 0;
+        $('pay-change').textContent = rp(Math.max(0, b - tot));
+      };
+
+      window.togglePayCashBox = () => {
+        const m = $('pay-metode').value;
+        $('pay-cash-box').style.display = m === 'Tunai' ? 'block' : 'none';
+      };
+    }
+
+    async function submitPayPending(id) {
+      const metode = $('pay-metode').value;
+      const bayar = +$('pay-bayar').value || 0;
+      const res = await act('/api/pay', { id, metode, bayar });
+      if (res && res.ok) {
+        toast(`Tagihan ${res.t.no} lunas!`, 'success');
+        closeModal();
+        printThermal(res.t);
+      }
+    }
+
+    function renderHistoryView() {
+      const box = $('history-view');
+      if (!box || !S) return;
+
+      const list = (S.trx || []).slice().reverse();
+
+      box.innerHTML = `
+        <div class="c-card">
+          <div class="c-title">
+            <span>Riwayat Transaksi Faat Choi</span>
+            <span class="m" style="font-size:12px;">Total ${list.length} transaksi</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>No TRX</th>
+                  <th>Waktu</th>
+                  <th>Pelanggan</th>
+                  <th>Meja</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Metode</th>
+                  <th style="text-align:right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(t => `
+                  <tr>
+                    <td><b>${t.no}</b></td>
+                    <td>${tgl(t.ts)}</td>
+                    <td>${esc(t.cust)}</td>
+                    <td>${t.meja ? `Meja ${t.meja}` : '-'}</td>
+                    <td style="font-weight:700; font-family:var(--font-mono);">${rp(t.total)}</td>
+                    <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
+                    <td>${t.metode || '-'}</td>
+                    <td style="text-align:right;">
+                      <button class="btn btn-sm btn-blue" onclick="printThermal(S.trx.find(x=>x.id===${t.id}))">🖨 Struk</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- TAB CEK STOK (READ-ONLY UNTUK KASIR) ---
+    function renderCheckStockView() {
+      const box = $('menu-view');
+      if (!box || !S) return;
+
+      const filtered = (S.menu || []).filter(m => {
+        return !stockSearch || m.n.toLowerCase().includes(stockSearch.toLowerCase()) || (m.cat || '').toLowerCase().includes(stockSearch.toLowerCase());
+      });
+
+      box.innerHTML = `
+        <div class="c-card" style="background:rgba(245,158,11,0.08); border-color:var(--amber); margin-bottom:16px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">🔒</span>
+            <div>
+              <b style="color:var(--amber);">Hak Akses Kasir (Hanya Cek Stok)</b>
+              <div style="font-size:12px; color:var(--tx-sub); margin-top:2px;">
+                Kasir hanya dapat memantau sisa stok barang untuk penjualan. Penambahan stok dan penambahan menu baru <b>hanya dapat dilakukan melalui akun Pemilik</b> demi keamanan inventaris.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="c-card">
+          <div class="c-title">
+            <span>Ketersediaan Stok Barang & Menu</span>
+            <input type="text" placeholder="🔍 Cari menu..." 
+              style="max-width:240px; margin:0;"
+              value="${esc(stockSearch)}"
+              oninput="stockSearch=this.value; renderCheckStockView()">
+          </div>
+
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Kategori</th>
+                  <th>Nama Menu / Minuman</th>
+                  <th>Harga Jual</th>
+                  <th>Sisa Stok Saat Ini</th>
+                  <th>Status Stok</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filtered.map(m => `
+                  <tr>
+                    <td><span class="badge" style="background:var(--bg); border:1px solid var(--card-border);">${m.cat || 'Minuman'}</span></td>
+                    <td><b>${esc(m.n)}</b></td>
+                    <td>${rp(m.p)}</td>
+                    <td>
+                      <b style="color:${m.s <= 0 ? 'var(--red)' : (m.s <= 5 ? 'var(--amber)' : 'var(--tx)')}; font-size:15px;">
+                        ${m.s} unit
+                      </b>
+                    </td>
+                    <td>
+                      ${m.s <= 0 ? `
+                        <span class="badge" style="background:rgba(239,68,68,0.2); color:var(--red);">HABIS</span>
+                      ` : (m.s <= 5 ? `
+                        <span class="badge" style="background:rgba(245,158,11,0.2); color:var(--amber);">MENIPIS (&le; 5)</span>
+                      ` : `
+                        <span class="badge" style="background:rgba(16,185,129,0.15); color:var(--primary);">TERSEDIA</span>
+                      `)}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // Modal Atur Lagu TV
+    function dialogNowPlaying() {
+      const cur = window.NOW_PLAYING || { title: '', artist: 'Spotify / YouTube' };
+      const content = `
+        <p style="color:var(--tx-sub); margin-bottom:12px; font-size:13px;">
+          Tuliskan judul lagu atau playlist yang sedang diputar di lounge agar pelanggan di TV bisa melihatnya.
+        </p>
+        <label>Judul Lagu / Playlist</label>
+        <input id="np-title" type="text" placeholder="Contoh: Lofi Mahjong Beats / Taylor Swift - Cruel Summer" value="${esc(cur.title)}">
+        <label>Sumber Musik</label>
+        <select id="np-source">
+          <option ${cur.source === 'Spotify' ? 'selected' : ''}>Spotify</option>
+          <option ${cur.source === 'YouTube' ? 'selected' : ''}>YouTube</option>
+          <option ${cur.source === 'YouTube Music' ? 'selected' : ''}>YouTube Music</option>
+          <option ${cur.source === 'Apple Music' ? 'selected' : ''}>Apple Music</option>
+        </select>
+      `;
+
+      const footer = `
+        <button class="btn" onclick="closeModal()">Batal</button>
+        <button class="btn btn-primary" onclick="submitNowPlaying()">Simpan ke Layar TV</button>
+      `;
+
+      openModal('🎵 Info Musik Layar TV', content, footer);
+    }
+
+    async function submitNowPlaying() {
+      const title = $('np-title').value.trim();
+      const source = $('np-source').value;
+      if (!title) return toast('Isi judul lagu terlebih dahulu', 'warn');
+
+      const res = await act('/api/now-playing', { title, artist: source, source });
+      if (res && res.ok) {
+        toast('Info lagu berhasil diperbarui di Layar TV!', 'success');
+        closeModal();
+      }
+    }
+
+    // --- SHARE SCREEN DARI KASIR KE LAYAR DISPLAY TV (WEBRTC + BROADCASTCHANNEL) ---
+    let kasirStream = null;
+    let kasirPc = null;
+    let kasirStreamId = null;
+    let kasirBc = null;
+    let kasirPollTimer = null;
+
+    try {
+      kasirBc = new BroadcastChannel('faat_choi_stream');
+      kasirBc.onmessage = async (evt) => {
+        const data = evt.data || {};
+        if (data.type === 'stream_answer' && data.streamId === kasirStreamId && kasirPc) {
+          if (kasirPc.signalingState === 'have-local-offer') {
+            try {
+              await kasirPc.setRemoteDescription(new RTCSessionDescription(data.answer));
+              console.log('[Kasir] Remote answer applied from BroadcastChannel');
+            } catch (e) {
+              console.warn('[Kasir] Error setting answer from BC:', e);
+            }
+          }
+        } else if (data.type === 'candidate' && data.from === 'display' && kasirPc) {
+          try {
+            await kasirPc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } catch (e) {}
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel not supported:', e);
+    }
+
+    function waitIceGathering(pc, maxWaitMs = 1200) {
+      return new Promise((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve(pc.localDescription);
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          pc.removeEventListener('icegatheringstatechange', checkState);
+          resolve(pc.localDescription);
+        };
+        const checkState = () => {
+          if (pc.iceGatheringState === 'complete') finish();
+        };
+        pc.addEventListener('icegatheringstatechange', checkState);
+        setTimeout(finish, maxWaitMs);
+      });
+    }
+
+    async function toggleKasirScreenShare() {
+      if (kasirStream) {
+        stopKasirScreenShare();
+      } else {
+        startKasirScreenShare();
+      }
+    }
+
+    async function startKasirScreenShare() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        return alert('Browser tidak mendukung Screen Share. Gunakan Google Chrome atau Microsoft Edge terbaru.');
+      }
+
+      try {
+        kasirStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'browser' },
+          audio: true
+        });
+      } catch (err) {
+        console.log('Share screen dibatalkan pengguna:', err);
+        return;
+      }
+
+      updateKasirStreamUI(true);
+
+      const videoTrack = kasirStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          stopKasirScreenShare();
+        };
+      }
+
+      kasirStreamId = Date.now();
+      kasirPc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      kasirPc.onicecandidate = (event) => {
+        if (event.candidate) {
+          if (kasirBc) {
+            kasirBc.postMessage({ type: 'candidate', from: 'kasir', candidate: event.candidate, streamId: kasirStreamId });
+          }
+          fetch('/api/stream/candidate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: 'kasir', candidate: event.candidate })
+          }).catch(() => {});
+        }
+      };
+
+      kasirStream.getTracks().forEach(track => {
+        kasirPc.addTrack(track, kasirStream);
+      });
+
+      try {
+        const offer = await kasirPc.createOffer();
+        await kasirPc.setLocalDescription(offer);
+        const completeOffer = await waitIceGathering(kasirPc, 1000);
+
+        if (kasirBc) {
+          kasirBc.postMessage({
+            type: 'stream_start',
+            streamId: kasirStreamId,
+            offer: completeOffer
+          });
+        }
+
+        await api('/api/stream/start', {
+          offer: completeOffer,
+          streamId: kasirStreamId
+        });
+
+        // Polling answer fallback
+        let attempts = 0;
+        if (kasirPollTimer) clearInterval(kasirPollTimer);
+        kasirPollTimer = setInterval(async () => {
+          attempts++;
+          if (!kasirStream || attempts > 60 || !kasirPc) {
+            clearInterval(kasirPollTimer);
+            return;
+          }
+          if (kasirPc.signalingState === 'stable') {
+            clearInterval(kasirPollTimer);
+            return;
+          }
+          try {
+            const res = await fetch('/api/stream/status');
+            const st = await res.json();
+            if (st && st.active && st.streamId === kasirStreamId && st.answer) {
+              if (kasirPc.signalingState === 'have-local-offer') {
+                await kasirPc.setRemoteDescription(new RTCSessionDescription(st.answer));
+                console.log('[Kasir] Remote answer applied via polling');
+                clearInterval(kasirPollTimer);
+              }
+            }
+          } catch (e) {}
+        }, 1000);
+
+        toast('📺 Siaran aktif! Layar TV display sekarang menampilkan YouTube / Spotify dari laptop kasir.', 'success', 6000);
+      } catch (err) {
+        console.error('Error starting WebRTC:', err);
+        stopKasirScreenShare();
+      }
+    }
+
+    function stopKasirScreenShare() {
+      if (kasirPollTimer) clearInterval(kasirPollTimer);
+      if (kasirStream) {
+        kasirStream.getTracks().forEach(t => t.stop());
+        kasirStream = null;
+      }
+      if (kasirPc) {
+        kasirPc.close();
+        kasirPc = null;
+      }
+      if (kasirBc) {
+        kasirBc.postMessage({ type: 'stream_stop', streamId: kasirStreamId });
+      }
+      fetch('/api/stream/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-token': TOKEN || '' },
+        body: JSON.stringify({})
+      }).catch(() => {});
+
+      kasirStreamId = null;
+      updateKasirStreamUI(false);
+      toast('Siaran layar ke TV telah dihentikan.', 'info');
+    }
+
+    function updateKasirStreamUI(isActive) {
+      const btn = $('btn-share-tv');
+      const banner = $('kasir-stream-banner');
+      if (btn) {
+        if (isActive) {
+          btn.innerHTML = '🛑 Hentikan Share Screen';
+          btn.className = 'btn btn-sm btn-danger';
+          btn.style.background = '#ef4444';
+          btn.style.borderColor = '#ef4444';
+          btn.style.color = '#ffffff';
+        } else {
+          btn.innerHTML = '📺 Share Layar ke TV';
+          btn.className = 'btn btn-sm';
+          btn.style.background = 'linear-gradient(135deg, rgba(6,182,212,0.25), rgba(16,185,129,0.25))';
+          btn.style.borderColor = 'var(--cyan)';
+          btn.style.color = 'var(--cyan)';
+        }
+      }
+      if (banner) {
+        banner.style.display = isActive ? 'flex' : 'none';
+      }
+    }
+  </script>
+</body>
+</html>

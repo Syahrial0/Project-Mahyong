@@ -1,0 +1,313 @@
+{
+  "cfg": {
+    "nama": "Faat Choi",
+    "tarif": 50000,
+    "tarifWeekday": 50000,
+    "tarifWeekend": 60000,
+    "meja": 4,
+    "pinO": "1111",
+    "pinK": "2222",
+    "alamat": "Jalan Sukamekar III No. 15, Bandung",
+    "instagram": "@faatchoimahjong",
+    "runningText": "Selamat Datang di Faat Choi Mahjong! Mahjong for Fun, Strictly No Gambling. Buka 09:00 - 22:00. Jl. Sukamekar III No. 15, Bandung. IG: @faatchoimahjong",
+    "nowPlaying": {
+      "title": "Lofi Mahjong Chill Beats",
+      "artist": "Spotify",
+      "source": "Spotify",
+      "updatedAt": 1795448532063
+    }
+  },
+  "seq": 12,
+  "menu": [
+    {
+      "id": 1795440930939,
+      "n": "MONSTER PUTIH",
+      "p": 75000,
+      "s": 7
+    }
+  ],
+  "trx": [
+    {
+      "id": 1795440809731,
+      "no": "TRX-0001",
+      "ts": 1795440809731,
+      "cust": "AL",
+      "meja": 1,
+      "jam": 4,
+      "sewa": 100000,
+      "items": [],
+      "total": 100000,
+      "status": "lunas",
+      "metode": "QRIS",
+      "paidAt": 1795440809731,
+      "by": "kasir"
+    },
+    {
+      "id": 1795440841028,
+      "no": "TRX-0002",
+      "ts": 1795440841028,
+      "cust": "Dom",
+      "meja": "-",
+      "jam": 1,
+      "sewa": 25000,
+      "items": [],
+      "total": 25000,
+      "status": "lunas",
+      "metode": "Tunai",
+      "paidAt": 1795440863331,
+      "by": "kasir"
+    },
+    {
+      "id": 1795441039475,
+      "no": "TRX-0003",
+      "ts": 1795441039475,
+      "cust": "Umum",
+      "meja": "-",
+      "jam": 4,
+      "sewa": 100000,
+      "items": [
+        {
+          "id": 1795440930939,
+          "n": "MONSTER PUTIH",
+          "p": 75000,
+          "q": 4
+        }
+      ],
+      "total": 400000,
+      "status": "lunas",
+      "metode": "QRIS",
+      "paidAt": 1795441039475,
+      "by": "kasir"
+    },
+    {
+      "id": 1795442371060,
+      "no": "TRX-0004",
+      "ts": 1795442371060,
+      "cust": "AL",
+      "meja": 1,
+      "jam": 2,
+      "sewa": 50000,
+      "items": [],
+      "diskon": 0,
+      "catatan": "Perpanjangan meja 1 (+2 jam)",
+      "total": 50000,
+      "status": "lunas",
+      "metode": "Tunai",
+      "bayar": 50000,
+      "kembali": 0,
+      "paidAt": 1795442479892,
+      "by": "kasir",
+      "paidBy": "kasir"
+    },
+    {
+      "id": 1795442514883,
+      "no": "TRX-0005",
+      "ts": 1795442514883,
+      "cust": "Dom",
+      "meja": 2,
+      "jam": 4,
+      "sewa": 100000,
+      "items": [
+        {
+          "id": 1795440930939,
+          "n": "MONSTER PUTIH",
+          "p": 75000,
+          "q": 4,
+          "sub": 300000
+        }
+      ],
+      "diskon": 0,
+      "catatan": "",
+      "total": 400000,
+      "status": "lunas",
+      "metode": "QRIS",
+      "bayar": 400000,
+      "kembali": 0,
+      "paidAt": 1795442514883,
+      "by": "kasir"
+    },
+    {
+      "id": 1795442561675,
+      "no": "TRX-0006",
+      "ts": 1795442561675,
+      "cust": "Rial",
+      "meja": 3,
+      "jam": 2,
+      "sewa": 50000,
+      "items": [],
+      "diskon": 0,
+      "catatan": "ES",
+      "total": 50000,
+      "status": "lunas",
+      "metode": "QRIS",
+      "bayar": 50000,
+      "kembali": 0,
+      "paidAt": 1795442561675,
+      "by": "kasir"
+    },
+    {
+      "id": 1795442747403,
+      "no": "TRX-0007",
+      "ts": 1795442747403,
+      "cust": "Umum",
+      "meja": "-",
+      "jam": 1,
+      "sewa": 25000,
+      "items": [
+        {
+          "id": 1795440930939,
+          "n": "MONSTER PUTIH",
+          "p": 75000,
+          "q": 12,
+          "sub": 900000
+        }
+      ],
+      "diskon": 0,
+      "catatan": "",
+      "total": 925000,
+      "status": "lunas",
+      "metode": "Tunai",
+      "bayar": 925000,
+      "kembali": 0,
+      "paidAt": 1795442747403,
+      "by": "kasir"
+    },
+    {
+      "id": 1795442894843,
+      "no": "TRX-0008",
+      "ts": 1795442894843,
+      "cust": "Rial",
+      "meja": "-",
+      "jam": 0,
+      "sewa": 0,
+      "items": [
+        {
+          "id": 1795440930939,
+          "n": "MONSTER PUTIH",
+          "p": 75000,
+          "q": 20,
+          "sub": 1500000
+        }
+      ],
+      "diskon": 0,
+      "catatan": "",
+      "total": 1500000,
+      "status": "lunas",
+      "metode": "Tunai",
+      "bayar": 2000000,
+      "kembali": 500000,
+      "paidAt": 1795442894843,
+      "by": "kasir"
+    },
+    {
+      "id": 1795443086594,
+      "no": "TRX-0009",
+      "ts": 1795443086594,
+      "cust": "VALEN",
+      "meja": 3,
+      "jam": 1,
+      "sewa": 25000,
+      "items": [],
+      "diskon": 0,
+      "catatan": "",
+      "total": 25000,
+      "status": "lunas",
+      "metode": "QRIS",
+      "bayar": 25000,
+      "kembali": 0,
+      "paidAt": 1795443086594,
+      "by": "kasir"
+    },
+    {
+      "id": 1795444507681,
+      "no": "TRX-0010",
+      "ts": 1795444507681,
+      "cust": "Budi Santoso",
+      "meja": 1,
+      "jam": 1.5,
+      "sewa": 37500,
+      "items": [],
+      "diskon": 0,
+      "catatan": "Main Bebas",
+      "total": 37500,
+      "status": "lunas",
+      "isOpen": false,
+      "metode": "Tunai",
+      "bayar": 50000,
+      "kembali": 12500,
+      "paidAt": 1795444507699,
+      "by": "kasir",
+      "paidBy": "kasir"
+    },
+    {
+      "id": 1795444575800,
+      "no": "TRX-0011",
+      "ts": 1795444575800,
+      "cust": "EJA",
+      "meja": 1,
+      "jam": 0,
+      "sewa": 0,
+      "items": [
+        {
+          "id": 1795440930939,
+          "n": "MONSTER PUTIH",
+          "p": 75000,
+          "q": 4,
+          "sub": 300000
+        }
+      ],
+      "diskon": 0,
+      "catatan": "Main Bebas",
+      "total": 300000,
+      "status": "pending",
+      "isOpen": true,
+      "metode": "-",
+      "bayar": 0,
+      "kembali": 0,
+      "paidAt": null,
+      "by": "kasir"
+    },
+    {
+      "id": 1795446993811,
+      "no": "TRX-0012",
+      "ts": 1795446993811,
+      "cust": "VALEN",
+      "meja": 4,
+      "jam": 200,
+      "rate": 50000,
+      "sewa": 10000000,
+      "items": [],
+      "diskon": 0,
+      "catatan": "Perpanjangan meja 4 (+200 jam)",
+      "total": 10000000,
+      "status": "lunas",
+      "metode": "Tunai",
+      "bayar": 10000000,
+      "kembali": 0,
+      "paidAt": 1795446993811,
+      "by": "kasir"
+    }
+  ],
+  "tables": {
+    "1": {
+      "cust": "EJA",
+      "start": 1795444575800,
+      "end": null,
+      "isOpen": true,
+      "trx": 1795444575800
+    },
+    "3": {
+      "cust": "Rial",
+      "start": 1795442561675,
+      "end": 1795449761675,
+      "trx": 1795442561675
+    },
+    "4": {
+      "cust": "VALEN",
+      "start": 1795443086594,
+      "end": 1796166993811,
+      "trx": 1795443086594,
+      "isOpen": false
+    }
+  }
+}

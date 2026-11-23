@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Faat Choi - Layar Status Meja & Top Spender</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800;900&family=JetBrains+Mono:wght@700;800&display=swap">
+  <style>
+    :root {
+      --bg: #070e0b;
+      --card-bg: rgba(18, 34, 27, 0.88);
+      --card-border: #1e4233;
+      --tx: #f8fafc;
+      --tx-muted: #8fa89b;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --gold: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+      color: var(--tx);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header.tv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: rgba(11, 22, 17, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .tv-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .tv-logo-img {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: white;
+      padding: 3px;
+      border: 2px solid var(--emerald);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .tv-title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+    }
+
+    .tv-subtitle {
+      font-size: 13px;
+      color: var(--emerald);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .tv-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tv-rate-pill {
+      font-size: 13px;
+      font-weight: 800;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid var(--emerald);
+      padding: 7px 15px;
+      border-radius: 99px;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+      letter-spacing: 0.5px;
+    }
+
+    .tv-clock {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 26px;
+      font-weight: 800;
+      color: #34d399;
+      letter-spacing: 1px;
+      text-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
+    }
+
+    .tv-date {
+      font-size: 12px;
+      color: var(--tx-muted);
+      text-align: right;
+    }
+
+    .tv-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--tx);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .tv-btn:hover { background: rgba(255, 255, 255, 0.16); }
+
+    .tv-btn-music {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(16, 185, 129, 0.2));
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-weight: 700;
+    }
+    .tv-btn-music:hover { background: var(--cyan); color: #032b30; }
+
+    .tv-stream-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--emerald);
+      color: var(--emerald);
+      padding: 7px 14px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      animation: pulse-stream 2s infinite ease-in-out;
+    }
+    .tv-stream-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
+    }
+    @keyframes pulse-stream {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
+
+    .tv-main {
+      flex: 1;
+      padding: 20px 28px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+    }
+
+    @media (max-width: 1024px) {
+      .tv-main { grid-template-columns: 1fr; }
+    }
+
+    .sec-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sec-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .sec-title {
+      font-size: 17px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .tv-table-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 16px;
+      flex: 1;
+    }
+
+    .tv-tbl {
+      background: rgba(14, 27, 21, 0.7);
+      border: 2px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .tv-tbl-num {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+    }
+
+    .tv-tbl-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 99px;
+      letter-spacing: 0.5px;
+    }
+
+    .tv-tbl-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 32px;
+      font-weight: 800;
+      margin: 12px 0 6px;
+      letter-spacing: -1px;
+    }
+
+    .tv-tbl-cust {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--tx);
+      min-height: 22px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tv-tbl-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .tv-tbl-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 1s linear;
+    }
+
+    .tv-tbl.free {
+      border-color: rgba(148, 163, 184, 0.2);
+      opacity: 0.75;
+    }
+    .tv-tbl.free .tv-tbl-badge {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--tx-muted);
+    }
+    .tv-tbl.free .tv-tbl-timer {
+      color: var(--tx-muted);
+      font-size: 22px;
+    }
+
+    .tv-tbl.open-play {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.3);
+    }
+    .tv-tbl.open-play .tv-tbl-badge {
+      background: var(--cyan);
+      color: #032b30;
+      font-weight: 900;
+    }
+    .tv-tbl.open-play .tv-tbl-timer {
+      color: #38bdf8;
+      text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+    }
+    .tv-tbl.open-play .tv-tbl-fill {
+      background: linear-gradient(90deg, #06b6d4, #10b981);
+      animation: tv-pulse-bar 2s infinite ease-in-out;
+    }
+
+    @keyframes tv-pulse-bar {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .tv-tbl.busy {
+      border-color: #3b82f6;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    }
+    .tv-tbl.busy .tv-tbl-badge {
+      background: #3b82f6;
+      color: white;
+    }
+    .tv-tbl.busy .tv-tbl-timer {
+      color: #60a5fa;
+      text-shadow: 0 0 15px rgba(96, 165, 250, 0.35);
+    }
+    .tv-tbl.busy .tv-tbl-fill {
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+    }
+
+    .tv-tbl.warn {
+      border-color: var(--amber);
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.3);
+      animation: pulse-warn 1.5s infinite;
+    }
+    .tv-tbl.warn .tv-tbl-badge {
+      background: var(--amber);
+      color: #3d2300;
+    }
+    .tv-tbl.warn .tv-tbl-timer {
+      color: var(--amber);
+      text-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+    }
+    .tv-tbl.warn .tv-tbl-fill {
+      background: var(--amber);
+    }
+
+    .tv-tbl.over {
+      border-color: var(--red);
+      background: linear-gradient(to bottom, rgba(22, 30, 49, 0.9), rgba(239, 68, 68, 0.25));
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+      animation: pulse-over 1s infinite;
+    }
+    .tv-tbl.over .tv-tbl-badge {
+      background: var(--red);
+      color: white;
+    }
+    .tv-tbl.over .tv-tbl-timer {
+      color: var(--red);
+      font-size: 24px;
+      text-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+    }
+    .tv-tbl.over .tv-tbl-fill {
+      background: var(--red);
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    @keyframes pulse-over {
+      0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); }
+      50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.6); }
+    }
+
+    /* Leaderboard */
+    .lb-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      max-height: 240px;
+    }
+
+    .lb-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(14, 27, 21, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+
+    .lb-row.top-1 {
+      border-color: #fbbf24;
+      background: linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(14, 27, 21, 0.7));
+      box-shadow: 0 0 15px rgba(251, 191, 36, 0.25);
+    }
+    .lb-row.top-2 {
+      border-color: #cbd5e1;
+      background: linear-gradient(90deg, rgba(203, 213, 225, 0.12), rgba(14, 27, 21, 0.7));
+    }
+    .lb-row.top-3 {
+      border-color: #d97706;
+      background: linear-gradient(90deg, rgba(217, 119, 6, 0.12), rgba(14, 27, 21, 0.7));
+    }
+
+    .lb-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lb-rank {
+      font-size: 16px;
+      width: 24px;
+      text-align: center;
+    }
+
+    .lb-name {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .lb-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--emerald);
+    }
+
+    /* Now Playing / Music Share Section */
+    .music-card {
+      margin-top: 16px;
+      background: rgba(14, 27, 21, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px;
+      position: relative;
+    }
+
+    .music-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .music-badge-live {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--emerald);
+      border: 1px solid var(--emerald);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    #tv-share-video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .music-visual-box {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(7, 14, 11, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .vinyl-disc {
+      width: 48px;
+      height: 48px;
+      background: radial-gradient(circle, #10b981 18%, #1f2937 19%, #111827 60%, #000 100%);
+      border-radius: 50%;
+      border: 2px solid #374151;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      animation: spin 5s linear infinite;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .equalizer-box {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 18px;
+      margin-left: auto;
+    }
+
+    .eq-bar {
+      width: 3px;
+      background: var(--emerald);
+      border-radius: 99px;
+      animation: eq-jump 1.2s infinite ease-in-out alternate;
+    }
+    .eq-bar:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 90%; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 40%; animation-delay: 0.2s; }
+    .eq-bar:nth-child(4) { height: 100%; animation-delay: 0.4s; }
+    .eq-bar:nth-child(5) { height: 70%; animation-delay: 0.15s; }
+
+    @keyframes eq-jump {
+      0% { height: 20%; }
+      100% { height: 100%; }
+    }
+
+    /* Running Text Marquee FIXED - TIDAK AKAN PERNAH TERTEMPA OLEH TEKS BERJALAN */
+    footer.tv-marquee {
+      background: #060c09;
+      border-top: 2px solid var(--emerald);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Wadah Badge yang Kaku dan Menutupi Latar Kiri Secara Permanen */
+    .marquee-badge-wrapper {
+      display: flex;
+      align-items: center;
+      background: #0a1610;
+      padding: 0 18px 0 24px;
+      height: 100%;
+      z-index: 25; /* Selalu di atas running text */
+      box-shadow: 12px 0 20px rgba(6, 12, 9, 0.98);
+      flex-shrink: 0;
+    }
+
+    .marquee-badge {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 99px;
+      letter-spacing: 0.8px;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+      white-space: nowrap;
+    }
+
+    /* Wadah Scrolling Terpisah yang Memotong Teks di Batas Kiri */
+    .marquee-scroll-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .marquee-content {
+      display: inline-block;
+      white-space: nowrap;
+      font-size: 17px; /* Huruf besar, jelas dan tebal */
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+      letter-spacing: 0.4px;
+      animation: marquee-scroll 32s linear infinite;
+      padding-left: 100%;
+    }
+
+    @keyframes marquee-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+<body>
+  <header class="tv-header">
+    <div class="tv-brand">
+      <img src="/logo_clean.png" alt="Faat Choi Logo" class="tv-logo-img">
+      <div>
+        <div class="tv-title" id="nm">Faat Choi</div>
+        <div class="tv-subtitle">Mahjong Club & Cafe · @faatchoimahjong</div>
+      </div>
+    </div>
+
+    <div class="tv-actions">
+      <div class="tv-rate-pill" id="tv-rate-badge">
+        📅 MEMUAT TARIF HARI INI...
+      </div>
+      <div>
+        <div class="tv-clock" id="tv-clock">--:--:--</div>
+        <div class="tv-date" id="tv-date">Loading...</div>
+      </div>
+      <div class="tv-stream-pill" id="tv-stream-indicator" style="display:none;" title="Siaran langsung dari laptop kasir aktif">
+        <span class="tv-stream-dot"></span>
+        <span>📺 Siaran Kasir Aktif</span>
+      </div>
+      <button class="tv-btn" onclick="toggleAudio()" id="btn-audio" title="Aktifkan Suara Bell & Musik">🔊 Suara</button>
+      <button class="tv-btn" onclick="toggleFullscreen()" title="Layar Penuh">⛶ Layar Penuh</button>
+    </div>
+  </header>
+
+  <main class="tv-main">
+    <!-- Grid Meja Utama -->
+    <section class="sec-card">
+      <div class="sec-head">
+        <div class="sec-title">
+          <span>🎯 Status Meja Mahjong</span>
+          <span style="font-size:12px; color:var(--tx-muted); font-weight:normal;" id="up-time">Diperbarui...</span>
+        </div>
+      </div>
+      <div class="tv-table-grid" id="tv-tables">
+        <p style="color:var(--tx-muted); text-align:center; grid-column:1/-1; padding:40px;">Memuat status meja...</p>
+      </div>
+    </section>
+
+    <!-- Kolom Kanan: Leaderboard & Musik -->
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <!-- Leaderboard -->
+      <section class="sec-card" style="margin-bottom:0;">
+        <div class="sec-head">
+          <div class="sec-title">
+            <span>🏆 Top Spender</span>
+          </div>
+        </div>
+        <div class="lb-list" id="tv-lb">
+          <p style="color:var(--tx-muted); text-align:center; padding:16px;">Memuat leaderboard...</p>
+        </div>
+      </section>
+
+      <!-- Now Playing / Live Music Section -->
+      <section class="sec-card" style="margin-bottom:0; flex:1;">
+        <div class="sec-head">
+          <div class="sec-title">
+            <span>🎵 Musik Lounge</span>
+          </div>
+          <span class="music-badge-live" id="music-status-pill">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--emerald);"></span>
+            <span id="music-status-text">NOW PLAYING</span>
+          </span>
+        </div>
+
+        <!-- Video Layar YouTube / Spotify Saat Share Screen -->
+        <video id="tv-share-video" autoplay playsinline muted style="display:none;"></video>
+
+        <!-- Kartu Visualizer Musik Saat Tidak Share Screen Video -->
+        <div id="tv-music-card" class="music-visual-box">
+          <div class="vinyl-disc">🀄</div>
+          <div style="overflow:hidden;">
+            <div id="np-song-title" style="font-size:14px; font-weight:800; color:var(--tx); white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">
+              Faat Choi Lounge Music
+            </div>
+            <div id="np-song-source" style="font-size:11px; color:var(--emerald); font-weight:700;">
+              Spotify & YouTube Music
+            </div>
+          </div>
+          <div class="equalizer-box">
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; font-size:11px; color:var(--tx-muted); line-height:1.4;" id="tv-music-tip">
+          Layar TV ini otomatis menampilkan siaran langsung lagu/video saat kasir menekan tombol <b>"📺 Share Layar ke TV"</b> di laptop kasir.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Running Text Marquee FIXED - TERPISAH DAN TIDAK AKAN MENIMPA BADGE INFO -->
+  <footer class="tv-marquee">
+    <div class="marquee-badge-wrapper">
+      <span class="marquee-badge">🀄 FAAT CHOI INFO</span>
+    </div>
+    <div class="marquee-scroll-container">
+      <div class="marquee-content" id="tv-running-text">
+        Selamat datang di Faat Choi Mahjong! Mahjong for Fun, Strictly No Gambling. Buka 09:00 - 22:00. Jl. Sukamekar III No. 15, Bandung. IG: @faatchoimahjong
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let P = null;
+    let serverOffset = 0;
+    let audioAllowed = false;
+    let alarmHistory = {};
+
+    const rp = n => 'Rp ' + Math.round(+n || 0).toLocaleString('id-ID');
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const now = () => Date.now() + serverOffset;
+
+    function fmt(ms) {
+      if (ms <= 0) return '00:00:00';
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return (h ? String(h).padStart(2, '0') + ':' : '') +
+        String(m).padStart(2, '0') + ':' +
+        String(s).padStart(2, '0');
+    }
+
+    let audioCtx = null;
+    function playBeep() {
+      if (!audioAllowed) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.setValueAtTime(660, t + 0.2);
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+        osc.start(t);
+        osc.stop(t + 0.5);
+      } catch (e) { }
+    }
+
+    function toggleAudio() {
+      audioAllowed = !audioAllowed;
+      const btn = document.getElementById('btn-audio');
+      if (btn) {
+        btn.textContent = audioAllowed ? '🔊 Suara Aktif' : '🔇 Suara Mati';
+        btn.style.color = audioAllowed ? '#10b981' : '#94a3b8';
+      }
+      const video = document.getElementById('tv-share-video');
+      if (video) {
+        video.muted = !audioAllowed;
+      }
+      if (audioAllowed) playBeep();
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // --- PENERIMA SIARAN SCREEN SHARE DARI KASIR (WEBRTC + BROADCASTCHANNEL) ---
+    let tvPc = null;
+    let activeStreamId = null;
+    let tvBc = null;
+
+    try {
+      tvBc = new BroadcastChannel('faat_choi_stream');
+      tvBc.onmessage = async (evt) => {
+        const data = evt.data || {};
+        if (data.type === 'stream_start' && data.offer) {
+          handleRemoteOffer(data.offer, data.streamId);
+        } else if (data.type === 'stream_stop') {
+          teardownTvStream();
+        } else if (data.type === 'candidate' && data.from === 'kasir' && tvPc) {
+          try {
+            await tvPc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } catch (e) {}
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel tidak didukung di browser ini:', e);
+    }
+
+    function waitIceGathering(pc, maxWaitMs = 1200) {
+      return new Promise((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve(pc.localDescription);
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          pc.removeEventListener('icegatheringstatechange', checkState);
+          resolve(pc.localDescription);
+        };
+        const checkState = () => {
+          if (pc.iceGatheringState === 'complete') finish();
+        };
+        pc.addEventListener('icegatheringstatechange', checkState);
+        setTimeout(finish, maxWaitMs);
+      });
+    }
+
+    async function handleRemoteOffer(offer, streamId) {
+      if (!offer || (activeStreamId === streamId && tvPc && tvPc.connectionState === 'connected')) return;
+      activeStreamId = streamId;
+
+      if (tvPc) {
+        try { tvPc.close(); } catch (e) {}
+        tvPc = null;
+      }
+
+      tvPc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      tvPc.onicecandidate = (event) => {
+        if (event.candidate) {
+          if (tvBc) {
+            tvBc.postMessage({ type: 'candidate', from: 'display', candidate: event.candidate, streamId });
+          }
+          fetch('/api/stream/candidate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: 'display', candidate: event.candidate })
+          }).catch(() => {});
+        }
+      };
+
+      tvPc.ontrack = (event) => {
+        const video = document.getElementById('tv-share-video');
+        const musicCard = document.getElementById('tv-music-card');
+        const pillText = document.getElementById('music-status-text');
+        const indicator = document.getElementById('tv-stream-indicator');
+
+        if (video) {
+          if (event.streams && event.streams[0]) {
+            video.srcObject = event.streams[0];
+          } else {
+            const stream = new MediaStream();
+            stream.addTrack(event.track);
+            video.srcObject = stream;
+          }
+          video.style.display = 'block';
+          video.muted = !audioAllowed;
+          video.play().catch(e => console.log('Video autoplay error:', e));
+        }
+
+        if (musicCard) musicCard.style.display = 'none';
+        if (pillText) pillText.textContent = 'LIVE SCREEN DARI KASIR';
+        if (indicator) indicator.style.display = 'flex';
+      };
+
+      try {
+        await tvPc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await tvPc.createAnswer();
+        await tvPc.setLocalDescription(answer);
+        const completeAnswer = await waitIceGathering(tvPc, 1000);
+
+        if (tvBc) {
+          tvBc.postMessage({
+            type: 'stream_answer',
+            streamId,
+            answer: completeAnswer
+          });
+        }
+
+        fetch('/api/stream/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ streamId, answer: completeAnswer })
+        }).catch(() => {});
+
+      } catch (err) {
+        console.error('Error handling remote offer on TV:', err);
+      }
+    }
+
+    function teardownTvStream() {
+      if (tvPc) {
+        try { tvPc.close(); } catch (e) {}
+        tvPc = null;
+      }
+      activeStreamId = null;
+
+      const video = document.getElementById('tv-share-video');
+      const musicCard = document.getElementById('tv-music-card');
+      const pillText = document.getElementById('music-status-text');
+      const indicator = document.getElementById('tv-stream-indicator');
+
+      if (video) {
+        video.srcObject = null;
+        video.style.display = 'none';
+      }
+      if (musicCard) musicCard.style.display = 'flex';
+      if (pillText) pillText.textContent = 'NOW PLAYING';
+      if (indicator) indicator.style.display = 'none';
+    }
+
+    function updateClock() {
+      const d = new Date();
+      document.getElementById('tv-clock').textContent = d.toLocaleTimeString('id-ID');
+      document.getElementById('tv-date').textContent = d.toLocaleDateString('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    async function pull() {
+      try {
+        const res = await fetch('/api/public');
+        P = await res.json();
+        serverOffset = P.now - Date.now();
+
+        document.getElementById('nm').textContent = 'Faat Choi';
+        document.getElementById('up-time').textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID');
+
+        // Update Rate Banner
+        if (P.tarifInfo) {
+          const badge = document.getElementById('tv-rate-badge');
+          if (badge) {
+            badge.innerHTML = `📅 <b>${P.tarifInfo.dayName.toUpperCase()} (${P.tarifInfo.isWeekend ? 'WEEKEND' : 'WEEKDAY'})</b> · TARIF <b>${rp(P.tarif)}/JAM</b>`;
+          }
+        }
+
+        // Running Text
+        if (P.runningText) {
+          const runEl = document.getElementById('tv-running-text');
+          if (runEl.textContent.trim() !== P.runningText.trim()) {
+            runEl.textContent = P.runningText;
+          }
+        }
+
+        // Cek status siaran layar dari kasir
+        if (P.streamActive) {
+          if (!activeStreamId || activeStreamId !== P.streamId) {
+            fetch('/api/stream/status')
+              .then(r => r.json())
+              .then(st => {
+                if (st && st.active && st.offer) {
+                  handleRemoteOffer(st.offer, st.streamId);
+                }
+              })
+              .catch(() => {});
+          }
+        } else {
+          if (activeStreamId) {
+            teardownTvStream();
+          }
+        }
+
+        // Now Playing Data
+        if (P.nowPlaying && !activeStreamId) {
+          const songEl = document.getElementById('np-song-title');
+          const srcEl = document.getElementById('np-song-source');
+          if (songEl && P.nowPlaying.title) songEl.textContent = P.nowPlaying.title;
+          if (srcEl && P.nowPlaying.source) srcEl.textContent = `${P.nowPlaying.source} · Faat Choi Lounge`;
+        }
+
+        renderLeaderboard(P.top || []);
+        drawTables();
+      } catch (err) {
+        document.getElementById('up-time').textContent = 'Koneksi terputus…';
+      }
+    }
+
+    function renderLeaderboard(top) {
+      const container = document.getElementById('tv-lb');
+      if (!top.length) {
+        container.innerHTML = '<p style="color:var(--tx-muted); text-align:center; padding:20px;">Belum ada data transaksi</p>';
+        return;
+      }
+
+      const medals = ['🥇', '🥈', '🥉'];
+      const rankClasses = ['top-1', 'top-2', 'top-3'];
+
+      container.innerHTML = top.slice(0, 6).map((t, idx) => `
+        <div class="lb-row ${rankClasses[idx] || ''}">
+          <div class="lb-left">
+            <span class="lb-rank">${medals[idx] || (idx + 1) + '.'}</span>
+            <div>
+              <div class="lb-name">${esc(t.n)}</div>
+              ${t.count ? `<div style="font-size:11px; color:var(--tx-muted);">${t.count}x main</div>` : ''}
+            </div>
+          </div>
+          <div class="lb-val">${rp(t.v)}</div>
+        </div>
+      `).join('');
+    }
+
+    function drawTables() {
+      if (!P || !P.tables) return;
+      const nw = now();
+      const container = document.getElementById('tv-tables');
+      let html = '';
+
+      for (let i = 1; i <= P.meja; i++) {
+        const t = P.tables[i];
+        let cls = 'free';
+        let badge = 'KOSONG';
+        let timer = '--:--:--';
+        let cust = 'Tersedia';
+        let pct = 0;
+
+        if (t) {
+          cust = esc(t.cust);
+
+          if (t.isOpen) {
+            cls = 'open-play';
+            badge = '♾️ MAIN BEBAS';
+            const elapsed = Math.max(0, nw - t.start);
+            timer = '⏱️ ' + fmt(elapsed);
+            pct = 100;
+          } else {
+            const left = t.end - nw;
+            const dur = Math.max(1, t.end - t.start);
+            pct = Math.max(0, Math.min(100, Math.round((left / dur) * 100)));
+
+            if (left <= 0) {
+              cls = 'over';
+              badge = 'WAKTU SELESAI';
+              timer = 'HABIS';
+              const k = i + ':' + t.end;
+              if (!alarmHistory[k]) {
+                alarmHistory[k] = true;
+                playBeep();
+              }
+            } else if (left <= 300000) {
+              cls = 'warn';
+              badge = 'SISA < 5 MENIT';
+              timer = fmt(left);
+            } else {
+              cls = 'busy';
+              badge = 'BERMAIN';
+              timer = fmt(left);
+            }
+          }
+        }
+
+        html += `
+          <div class="tv-tbl ${cls}">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="tv-tbl-num">Meja ${i}</span>
+                <span class="tv-tbl-badge">${badge}</span>
+              </div>
+              <div class="tv-tbl-timer">${timer}</div>
+              <div class="tv-tbl-cust">${cust}</div>
+            </div>
+            <div class="tv-tbl-bar">
+              <div class="tv-tbl-fill" style="width: ${t ? pct : 0}%;"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    pull();
+    setInterval(pull, 4000);
+    setInterval(drawTables, 1000);
+  </script>
+</body>
+</html>

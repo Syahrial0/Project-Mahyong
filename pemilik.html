@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pemilik - Faat Choi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/common.js"></script>
+</head>
+<body>
+  <div class="pos-app" id="app"></div>
+
+  <script>
+    let S = null;
+    let currentTab = 'laporan';
+    let filterRange = 'hari';
+    let trxStatusFilter = 'semua';
+    let trxSearch = '';
+
+    boot('pemilik', main);
+
+    function main() {
+      $('app').innerHTML = `
+        ${renderHeader('Executive Dashboard Pemilik')}
+        <nav class="pos-nav">
+          <button id="nav-laporan" class="active" onclick="switchTab('laporan')">📊 Laporan & Keuangan</button>
+          <button id="nav-trx" onclick="switchTab('trx')">📜 Semua Transaksi & Void</button>
+          <button id="nav-menu" onclick="switchTab('menu')">📦 Menu & Stok Gudang</button>
+          <button id="nav-cfg" onclick="switchTab('cfg')">⚙️ Pengaturan & Backup</button>
+        </nav>
+        <div id="view-content"></div>
+      `;
+
+      switchTab('laporan');
+      pull();
+      setInterval(() => {
+        if (currentTab !== 'cfg') pull();
+      }, 5000);
+    }
+
+    async function pull() {
+      try {
+        S = await api('/api/db');
+        serverOffset = S.now - Date.now();
+        window.NAMA = 'Faat Choi';
+        window.TARIF_INFO = S.tarifInfo;
+        window.CURRENT_TARIF = S.tarifInfo ? S.tarifInfo.tarif : (S.cfg.tarif || 50000);
+        window.TARIF = window.CURRENT_TARIF;
+        window.MEJA_COUNT = S.cfg.meja;
+        
+        const hdr = $('hdr-nama');
+        if (hdr) hdr.textContent = 'Faat Choi';
+
+        const rateTxt = $('rate-text');
+        if (rateTxt && S.tarifInfo) {
+          rateTxt.innerHTML = `<b>${S.tarifInfo.dayName}</b> (${S.tarifInfo.isWeekend ? 'Weekend' : 'Weekday'}) · <b>${rp(S.tarifInfo.tarif)}/jam</b>`;
+        }
+
+        renderCurrentView();
+      } catch (err) {
+        console.error('Pull error:', err);
+      }
+    }
+
+    function switchTab(t) {
+      currentTab = t;
+      ['laporan', 'trx', 'menu', 'cfg'].forEach(k => {
+        const el = $('nav-' + k);
+        if (el) el.className = (k === t) ? 'active' : '';
+      });
+
+      const container = $('view-content');
+      if (t === 'laporan') {
+        container.innerHTML = `<div id="laporan-view"></div>`;
+      } else if (t === 'trx') {
+        container.innerHTML = `<div id="trx-view"></div>`;
+      } else if (t === 'menu') {
+        container.innerHTML = `<div id="menu-view"></div>`;
+      } else if (t === 'cfg') {
+        container.innerHTML = `<div id="cfg-view"></div>`;
+        renderConfigView();
+      }
+
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      if (!S) return;
+      if (currentTab === 'laporan') renderLaporanView();
+      if (currentTab === 'trx') renderTrxView();
+      if (currentTab === 'menu') renderMenuView();
+    }
+
+    function isInRange(t) {
+      const d = new Date(t.ts);
+      const nw = new Date();
+      if (filterRange === 'hari') {
+        return d.toDateString() === nw.toDateString();
+      }
+      if (filterRange === 'kemarin') {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        return d.toDateString() === y.toDateString();
+      }
+      if (filterRange === '7hari') {
+        const d7 = new Date();
+        d7.setDate(d7.getDate() - 7);
+        return d >= d7;
+      }
+      if (filterRange === 'bulan') {
+        return d.getMonth() === nw.getMonth() && d.getFullYear() === nw.getFullYear();
+      }
+      return true;
+    }
+
+    function renderLaporanView() {
+      const box = $('laporan-view');
+      if (!box || !S) return;
+
+      const filtered = (S.trx || []).filter(isInRange);
+      const lunasTrx = filtered.filter(t => t.status === 'lunas');
+      const pendingTrx = filtered.filter(t => t.status === 'pending');
+
+      const totalLunas = lunasTrx.reduce((a, t) => a + t.total, 0);
+      const totalPending = pendingTrx.reduce((a, t) => a + t.total, 0);
+      
+      const omsetSewa = lunasTrx.reduce((a, t) => a + (t.sewa || 0), 0);
+      const omsetFnb = lunasTrx.reduce((a, t) => a + (t.items || []).reduce((x, i) => x + (i.p * i.q), 0), 0);
+
+      const pctSewa = totalLunas > 0 ? Math.round((omsetSewa / (omsetSewa + omsetFnb || 1)) * 100) : 50;
+      const pctFnb = 100 - pctSewa;
+
+      box.innerHTML = `
+        <div class="c-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-weight:700;">Periode:</span>
+              <select id="sel-period" style="width:auto; margin:0;" onchange="filterRange=this.value; renderLaporanView()">
+                <option value="hari" ${filterRange === 'hari' ? 'selected' : ''}>Hari Ini</option>
+                <option value="kemarin" ${filterRange === 'kemarin' ? 'selected' : ''}>Kemarin</option>
+                <option value="7hari" ${filterRange === '7hari' ? 'selected' : ''}>7 Hari Terakhir</option>
+                <option value="bulan" ${filterRange === 'bulan' ? 'selected' : ''}>Bulan Ini</option>
+                <option value="semua" ${filterRange === 'semua' ? 'selected' : ''}>Semua Waktu</option>
+              </select>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-sm btn-blue" onclick="exportCSV()">📊 Unduh Excel / CSV</button>
+              <button class="btn btn-sm btn-primary" onclick="exportPDF()">📄 Unduh Laporan PDF</button>
+            </div>
+          </div>
+
+          <div class="grid-4">
+            <div class="c-card" style="margin:0; background:var(--bg);">
+              <div style="font-size:12px; color:var(--tx-muted); font-weight:600;">PEMASUKAN BERSIH (LUNAS)</div>
+              <div style="font-size:24px; font-weight:800; color:var(--primary); font-family:var(--font-mono); margin:6px 0;">${rp(totalLunas)}</div>
+              <div style="font-size:12px; color:var(--tx-muted);">${lunasTrx.length} transaksi selesai</div>
+            </div>
+
+            <div class="c-card" style="margin:0; background:var(--bg);">
+              <div style="font-size:12px; color:var(--tx-muted); font-weight:600;">PIUTANG PENDING</div>
+              <div style="font-size:24px; font-weight:800; color:var(--amber); font-family:var(--font-mono); margin:6px 0;">${rp(totalPending)}</div>
+              <div style="font-size:12px; color:var(--tx-muted);">${pendingTrx.length} tagihan belum dibayar</div>
+            </div>
+
+            <div class="c-card" style="margin:0; background:var(--bg);">
+              <div style="font-size:12px; color:var(--tx-muted); font-weight:600;">SEWA MEJA MAHJONG</div>
+              <div style="font-size:24px; font-weight:800; color:var(--blue); font-family:var(--font-mono); margin:6px 0;">${rp(omsetSewa)}</div>
+              <div style="font-size:12px; color:var(--tx-muted);">${pctSewa}% dari omset total</div>
+            </div>
+
+            <div class="c-card" style="margin:0; background:var(--bg);">
+              <div style="font-size:12px; color:var(--tx-muted); font-weight:600;">PENJUALAN F&B</div>
+              <div style="font-size:24px; font-weight:800; color:var(--primary); font-family:var(--font-mono); margin:6px 0;">${rp(omsetFnb)}</div>
+              <div style="font-size:12px; color:var(--tx-muted);">${pctFnb}% dari omset total</div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:6px;">
+              <span>Sewa Meja: ${pctSewa}%</span>
+              <span>Minuman & Makanan: ${pctFnb}%</span>
+            </div>
+            <div style="height:12px; background:var(--card-border); border-radius:99px; overflow:hidden; display:flex;">
+              <div style="width:${pctSewa}%; background:var(--blue); transition:width 0.4s ease;"></div>
+              <div style="width:${pctFnb}%; background:var(--primary); transition:width 0.4s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="c-card">
+          <div class="c-title">
+            <span>Rincian Transaksi (${filtered.length} total)</span>
+          </div>
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>No TRX</th>
+                  <th>Waktu</th>
+                  <th>Pelanggan</th>
+                  <th>Meja</th>
+                  <th>Sewa Meja</th>
+                  <th>Pesanan Menu</th>
+                  <th>Diskon</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filtered.slice().reverse().map(t => `
+                  <tr>
+                    <td><b>${t.no}</b></td>
+                    <td>${tgl(t.ts)}</td>
+                    <td><b>${esc(t.cust)}</b></td>
+                    <td>${t.meja ? `Meja ${t.meja}` : '-'}</td>
+                    <td>${t.sewa ? rp(t.sewa) : '-'}</td>
+                    <td>${(t.items || []).map(i => `${esc(i.n)} (${i.q})`).join(', ') || '-'}</td>
+                    <td>${t.diskon ? `-${rp(t.diskon)}` : '-'}</td>
+                    <td style="font-weight:700; font-family:var(--font-mono); font-size:14px;">${rp(t.total)}</td>
+                    <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
+                    <td><button class="btn btn-sm btn-blue" onclick="printThermal(S.trx.find(x=>x.id===${t.id}))">Struk</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function exportPDF() {
+      if (!window.jspdf) return toast('Pustaka PDF sedang dimuat...', 'warn');
+      const filtered = (S.trx || []).filter(isInRange);
+      const lunas = filtered.filter(t => t.status === 'lunas');
+      const total = lunas.reduce((a, t) => a + t.total, 0);
+
+      const doc = new window.jspdf.jsPDF();
+      let y = 16;
+      doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+      doc.text('Laporan Keuangan - Faat Choi Mahjong', 14, y);
+      y += 8;
+
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+      doc.text(`Periode: ${filterRange.toUpperCase()} | Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, y);
+      y += 6;
+      doc.text(`Total Pemasukan (Lunas): ${rp(total)} (${lunas.length} transaksi)`, 14, y);
+      y += 10;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('No', 14, y);
+      doc.text('Waktu', 36, y);
+      doc.text('Pelanggan', 75, y);
+      doc.text('Meja', 120, y);
+      doc.text('Total', 145, y);
+      doc.text('Status', 180, y);
+      doc.setFont('helvetica', 'normal');
+      doc.line(14, y + 2, 196, y + 2);
+      y += 8;
+
+      filtered.forEach(t => {
+        if (y > 275) {
+          doc.addPage();
+          y = 16;
+        }
+        doc.text(t.no, 14, y);
+        doc.text(tgl(t.ts).slice(0, 14), 36, y);
+        doc.text(t.cust.slice(0, 20), 75, y);
+        doc.text(String(t.meja), 120, y);
+        doc.text(rp(t.total), 145, y);
+        doc.text(t.status.toUpperCase(), 180, y);
+        y += 6;
+      });
+
+      doc.save(`laporan-keuangan-faatchoi-${filterRange}-${Date.now()}.pdf`);
+      toast('Laporan PDF berhasil diunduh', 'success');
+    }
+
+    function exportCSV() {
+      const filtered = (S.trx || []).filter(isInRange);
+      let csv = '\uFEFFNo TRX,Waktu,Pelanggan,Meja,Jam Sewa,Biaya Sewa,Item F&B,Diskon,Total,Status,Metode Bayar,Kasir\n';
+
+      filtered.forEach(t => {
+        const itemsStr = (t.items || []).map(i => `${i.n} x${i.q}`).join('; ');
+        const row = [
+          t.no,
+          `"${tgl(t.ts)}"`,
+          `"${esc(t.cust)}"`,
+          t.meja,
+          t.jam || 0,
+          t.sewa || 0,
+          `"${itemsStr}"`,
+          t.diskon || 0,
+          t.total,
+          t.status,
+          t.metode || '-',
+          t.by || '-'
+        ];
+        csv += row.join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-faatchoi-${filterRange}-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast('File Excel/CSV berhasil diunduh', 'success');
+    }
+
+    function renderTrxView() {
+      const box = $('trx-view');
+      if (!box || !S) return;
+
+      const list = (S.trx || []).filter(t => {
+        const matchStatus = trxStatusFilter === 'semua' || t.status === trxStatusFilter;
+        const matchSearch = !trxSearch || 
+          t.no.toLowerCase().includes(trxSearch.toLowerCase()) || 
+          t.cust.toLowerCase().includes(trxSearch.toLowerCase());
+        return matchStatus && matchSearch;
+      }).reverse();
+
+      box.innerHTML = `
+        <div class="c-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span style="font-weight:700;">Filter:</span>
+              <select style="width:auto; margin:0;" onchange="trxStatusFilter=this.value; renderTrxView()">
+                <option value="semua">Semua Status</option>
+                <option value="lunas">Hanya Lunas</option>
+                <option value="pending">Hanya Pending</option>
+                <option value="batal">Hanya Dibatalkan (Void)</option>
+              </select>
+            </div>
+            <input type="text" placeholder="🔍 Cari No TRX / Pelanggan..." 
+              style="max-width:260px; margin:0;"
+              oninput="trxSearch=this.value; renderTrxView()">
+          </div>
+
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>No TRX</th>
+                  <th>Waktu</th>
+                  <th>Pelanggan</th>
+                  <th>Meja</th>
+                  <th>Rincian</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Kasir</th>
+                  <th style="text-align:right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(t => `
+                  <tr style="${t.status === 'batal' ? 'opacity:0.6; text-decoration:line-through;' : ''}">
+                    <td><b>${t.no}</b></td>
+                    <td>${tgl(t.ts)}</td>
+                    <td><b>${esc(t.cust)}</b></td>
+                    <td>${t.meja ? `Meja ${t.meja}` : '-'}</td>
+                    <td>
+                      ${t.jam ? `<span class="badge" style="background:rgba(59,130,246,0.15); color:var(--blue);">Sewa ${t.jam}j</span> ` : ''}
+                      ${(t.items || []).map(i => `${esc(i.n)} x${i.q}`).join(', ')}
+                      ${t.catatan ? `<div style="font-size:11px; color:var(--tx-muted);">${esc(t.catatan)}</div>` : ''}
+                      ${t.batalAlasan ? `<div style="font-size:11px; color:var(--red);">Alasan batal: ${esc(t.batalAlasan)}</div>` : ''}
+                    </td>
+                    <td style="font-weight:700; font-family:var(--font-mono);">${rp(t.total)}</td>
+                    <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
+                    <td>${t.by || '-'}</td>
+                    <td style="text-align:right; white-space:nowrap;">
+                      <button class="btn btn-sm btn-blue" onclick="printThermal(S.trx.find(x=>x.id===${t.id}))">Struk</button>
+                      ${t.status !== 'batal' ? `
+                        <button class="btn btn-sm btn-danger" onclick="dialogVoidTrx(${t.id})">Batalkan (Void)</button>
+                      ` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function dialogVoidTrx(id) {
+      const t = S.trx.find(x => x.id === id);
+      if (!t) return;
+
+      const content = `
+        <div style="margin-bottom:12px; color:var(--red); font-weight:700;">
+          ⚠️ PERINGATAN: Pembatalan Transaksi (VOID)
+        </div>
+        <p style="color:var(--tx-sub); margin-bottom:14px; font-size:13px;">
+          Transaksi <b>${t.no}</b> (${esc(t.cust)} - ${rp(t.total)}) akan dibatalkan.
+          Semua stok barang F&B dalam transaksi ini akan <b>dikembalikan secara otomatis</b> ke inventaris.
+        </p>
+        <label>Alasan Pembatalan</label>
+        <input id="void-alasan" type="text" placeholder="Contoh: Salah input pesanan / batal main">
+      `;
+
+      const footer = `
+        <button class="btn" onclick="closeModal()">Kembali</button>
+        <button class="btn btn-danger" onclick="submitVoidTrx(${t.id})">Konfirmasi VOID</button>
+      `;
+
+      openModal(`Batalkan Transaksi ${t.no}`, content, footer);
+    }
+
+    async function submitVoidTrx(id) {
+      const alasan = $('void-alasan').value.trim() || 'Dibatalkan oleh pemilik';
+      const res = await act('/api/trx-void', { id, alasan });
+      if (res && res.ok) {
+        toast(`Transaksi berhasil dibatalkan dan stok telah dikembalikan`, 'success');
+        closeModal();
+      }
+    }
+
+    function renderMenuView() {
+      const box = $('menu-view');
+      if (!box || !S) return;
+
+      box.innerHTML = `
+        <div class="grid-2">
+          <div class="c-card">
+            <div class="c-title">Tambah Menu / Produk Baru</div>
+            <label>Kategori Produk</label>
+            <select id="pm-cat">
+              <option>Minuman</option>
+              <option>Makanan</option>
+              <option>Snack</option>
+              <option>Rokok / Lainnya</option>
+            </select>
+            <label>Nama Menu</label>
+            <input id="pm-nama" type="text" placeholder="Contoh: Monster Putih / Kopi Hitam">
+            <div class="grid-2">
+              <div>
+                <label>Harga Jual (Rp)</label>
+                <input id="pm-harga" type="number" step="1000" placeholder="15000">
+              </div>
+              <div>
+                <label>Stok Awal</label>
+                <input id="pm-stok" type="number" placeholder="50">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" style="margin-top:8px;" onclick="ownerAddMenu()">Simpan Menu Baru</button>
+          </div>
+
+          <div class="c-card">
+            <div class="c-title">Peringatan Stok Gudang Menipis (&le; 5)</div>
+            ${(S.menu || []).filter(m => m.s <= 5).map(m => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--card-border);">
+                <div>
+                  <b style="color:var(--red);">${esc(m.n)}</b>
+                  <div style="font-size:12px; color:var(--tx-muted);">${m.cat || 'Minuman'} · ${rp(m.p)}</div>
+                </div>
+                <div>
+                  Sisa: <b style="color:var(--red); font-size:15px;">${m.s}</b>
+                  <button class="btn btn-sm btn-primary" style="margin-left:8px;" onclick="ownerAddStock(${m.id}, 20)">+20</button>
+                </div>
+              </div>
+            `).join('') || '<div style="color:var(--tx-muted); text-align:center; padding:20px;">Semua stok barang aman 👍</div>'}
+          </div>
+        </div>
+
+        <div class="c-card">
+          <div class="c-title">Daftar Semua Menu & Inventaris Faat Choi</div>
+          <div class="table-responsive">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Kategori</th>
+                  <th>Nama Menu</th>
+                  <th>Harga Jual</th>
+                  <th>Stok</th>
+                  <th style="text-align:right;">Kelola</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(S.menu || []).map(m => `
+                  <tr>
+                    <td><span class="badge" style="background:var(--bg); border:1px solid var(--card-border);">${m.cat || 'Minuman'}</span></td>
+                    <td><b>${esc(m.n)}</b></td>
+                    <td>${rp(m.p)}</td>
+                    <td><b style="color:${m.s <= 5 ? 'var(--red)' : 'var(--tx)'}; font-size:15px;">${m.s}</b></td>
+                    <td style="text-align:right; white-space:nowrap;">
+                      <button class="btn btn-sm" onclick="ownerAddStock(${m.id}, -1)">−</button>
+                      <button class="btn btn-sm" onclick="ownerAddStock(${m.id}, 1)">+</button>
+                      <button class="btn btn-sm" onclick="ownerEditDetails(${m.id})">Edit</button>
+                      <button class="btn btn-sm btn-danger" onclick="ownerDeleteMenu(${m.id})">Hapus</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    async function ownerAddMenu() {
+      const n = $('pm-nama').value.trim();
+      const p = +$('pm-harga').value;
+      const s = +$('pm-stok').value || 0;
+      const cat = $('pm-cat').value;
+      if (!n || p <= 0) return toast('Harap isi nama dan harga menu dengan benar', 'warn');
+
+      const res = await act('/api/menu', { op: 'add', n, p, s, cat });
+      if (res && res.ok) {
+        toast(`Menu "${n}" berhasil disimpan`, 'success');
+        $('pm-nama').value = '';
+        $('pm-harga').value = '';
+        $('pm-stok').value = '';
+      }
+    }
+
+    async function ownerAddStock(id, delta) {
+      await act('/api/menu', { op: 'stok', id, d: delta });
+    }
+
+    function ownerEditDetails(id) {
+      const m = S.menu.find(x => x.id === id);
+      if (!m) return;
+
+      const content = `
+        <label>Nama Menu</label>
+        <input id="ed-nama" type="text" value="${esc(m.n)}">
+        <label>Kategori</label>
+        <select id="ed-cat">
+          <option ${m.cat === 'Minuman' ? 'selected' : ''}>Minuman</option>
+          <option ${m.cat === 'Makanan' ? 'selected' : ''}>Makanan</option>
+          <option ${m.cat === 'Snack' ? 'selected' : ''}>Snack</option>
+          <option ${m.cat === 'Rokok / Lainnya' ? 'selected' : ''}>Rokok / Lainnya</option>
+        </select>
+        <label>Harga Jual (Rp)</label>
+        <input id="ed-harga" type="number" step="1000" value="${m.p}">
+        <label>Stok Saat Ini</label>
+        <input id="ed-stok" type="number" value="${m.s}">
+      `;
+
+      const footer = `
+        <button class="btn" onclick="closeModal()">Batal</button>
+        <button class="btn btn-primary" onclick="submitEditDetails(${m.id})">Simpan Perubahan</button>
+      `;
+
+      openModal(`Edit Menu: ${m.n}`, content, footer);
+    }
+
+    async function submitEditDetails(id) {
+      const n = $('ed-nama').value.trim();
+      const p = +$('ed-harga').value;
+      const s = +$('ed-stok').value;
+      const cat = $('ed-cat').value;
+      if (!n || p <= 0) return toast('Nama dan harga harus valid', 'warn');
+
+      const res = await act('/api/menu', { op: 'edit', id, n, p, s, cat });
+      if (res && res.ok) {
+        toast('Menu berhasil diperbarui', 'success');
+        closeModal();
+      }
+    }
+
+    async function ownerDeleteMenu(id) {
+      if (confirm('Yakin ingin menghapus menu ini dari daftar?')) {
+        const res = await act('/api/menu', { op: 'hapus', id });
+        if (res && res.ok) toast('Menu telah dihapus', 'info');
+      }
+    }
+
+    function renderConfigView() {
+      const box = $('cfg-view');
+      if (!box || !S) return;
+      const c = S.cfg;
+      const info = S.tarifInfo || { dayName: 'Hari Ini', tarif: 50000, label: 'Weekday' };
+
+      box.innerHTML = `
+        <div class="grid-2">
+          <div class="c-card">
+            <div class="c-title">Pengaturan Faat Choi Mahjong</div>
+            
+            <div class="rate-badge" style="margin-bottom:14px; font-size:13px;">
+              Status Hari Ini: <b>${info.dayName} (${info.label})</b> &rarr; Berlaku <b>${rp(info.tarif)}/jam</b>
+            </div>
+
+            <label>Nama Usaha (Tetap)</label>
+            <input id="cfg-nama" type="text" value="Faat Choi" disabled style="opacity:0.7;">
+
+            <div class="grid-2">
+              <div>
+                <label>Tarif Senin - Kamis (Rp/jam)</label>
+                <input id="cfg-tarif-weekday" type="number" step="5000" value="${c.tarifWeekday || 50000}">
+              </div>
+              <div>
+                <label>Tarif Jumat - Minggu (Rp/jam)</label>
+                <input id="cfg-tarif-weekend" type="number" step="5000" value="${c.tarifWeekend || 60000}">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div>
+                <label>Jumlah Meja (1 - 30)</label>
+                <input id="cfg-meja" type="number" min="1" max="30" value="${c.meja}">
+              </div>
+              <div>
+                <label>Akun Instagram</label>
+                <input id="cfg-ig" type="text" value="${esc(c.instagram || '@faatchoimahjong')}">
+              </div>
+            </div>
+
+            <label>Alamat Usaha</label>
+            <input id="cfg-alamat" type="text" value="${esc(c.alamat || 'Jalan Sukamekar III No. 15, Bandung')}">
+
+            <label>Teks Pengumuman Layar TV (Running Text)</label>
+            <textarea id="cfg-text" rows="2">${esc(c.runningText || '')}</textarea>
+            
+            <div class="grid-2" style="margin-top:8px;">
+              <div>
+                <label>PIN Pemilik (Minimal 4 Angka)</label>
+                <input id="cfg-pino" type="password" value="${esc(c.pinO)}">
+              </div>
+              <div>
+                <label>PIN Kasir (Minimal 4 Angka)</label>
+                <input id="cfg-pink" type="password" value="${esc(c.pinK)}">
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" style="margin-top:14px; padding:12px;" onclick="saveConfig()">Simpan Pengaturan</button>
+          </div>
+
+          <div class="c-card">
+            <div class="c-title">Cadangan (Backup & Restore Data)</div>
+            <p style="font-size:13px; color:var(--tx-muted); margin-bottom:14px;">
+              Unduh salinan cadangan database Faat Choi secara berkala.
+            </p>
+            <button class="btn btn-blue btn-block" style="padding:12px; margin-bottom:16px;" onclick="downloadBackup()">
+              💾 Unduh Cadangan Database (JSON)
+            </button>
+
+            <div style="border-top:1px dashed var(--card-border); padding-top:16px;">
+              <label>Pulihkan Database dari File JSON</label>
+              <input id="file-restore" type="file" accept=".json" style="margin-top:8px;">
+              <button class="btn btn-danger btn-block" style="margin-top:8px;" onclick="restoreBackup()">
+                ⚠️ Pulihkan Database
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function saveConfig() {
+      const cfg = {
+        nama: 'Faat Choi',
+        tarifWeekday: +$('cfg-tarif-weekday').value || 50000,
+        tarifWeekend: +$('cfg-tarif-weekend').value || 60000,
+        meja: +$('cfg-meja').value,
+        instagram: $('cfg-ig').value.trim(),
+        alamat: $('cfg-alamat').value.trim(),
+        runningText: $('cfg-text').value.trim(),
+        pinO: $('cfg-pino').value.trim(),
+        pinK: $('cfg-pink').value.trim()
+      };
+
+      if (cfg.pinO.length < 4 || cfg.pinK.length < 4) {
+        return toast('PIN minimal 4 karakter/angka', 'warn');
+      }
+
+      const res = await act('/api/cfg', { cfg });
+      if (res && res.ok) {
+        toast('Pengaturan Faat Choi berhasil disimpan!', 'success');
+      }
+    }
+
+    function downloadBackup() {
+      window.open('/api/backup', '_blank');
+    }
+
+    function restoreBackup() {
+      const f = $('file-restore').files[0];
+      if (!f) return toast('Pilih file backup .json terlebih dahulu', 'warn');
+      if (!confirm('PERINGATAN: Memulihkan database akan menimpa data yang ada saat ini. Lanjutkan?')) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const res = await act('/api/restore', { data });
+          if (res && res.ok) {
+            toast('Database berhasil dipulihkan!', 'success');
+            setTimeout(() => location.reload(), 1500);
+          }
+        } catch (err) {
+          toast('Format file JSON tidak valid', 'error');
+        }
+      };
+      reader.readAsText(f);
+    }
+  </script>
+</body>
+</html>
